@@ -21,6 +21,12 @@ tree = discord.app_commands.CommandTree(client)
 
 THREAD_ID = int(os.environ.get("THREAD_ID"))
 START_ROW = int(os.environ.get("START_ROW", 64))
+ALLOWED_ROLE_ID = int(os.environ.get("ALLOWED_ROLE_ID"))
+
+# --- التحقق من الرول ---
+def has_allowed_role(interaction: discord.Interaction) -> bool:
+    role_ids = [role.id for role in interaction.user.roles]
+    return ALLOWED_ROLE_ID in role_ids
 
 # --- Modal ---
 class EmployeeModal(discord.ui.Modal, title="تسجيل موظف جديد"):
@@ -36,7 +42,6 @@ class EmployeeModal(discord.ui.Modal, title="تسجيل موظف جديد"):
         today = datetime.now().strftime("%Y-%m-%d")
         row = [discord_id, self.f_rank.value, self.f_name.value, self.f_code.value, today]
 
-        # لو حدد صف معين
         if self.f_row.value.strip():
             try:
                 next_row = int(self.f_row.value.strip())
@@ -53,7 +58,6 @@ class EmployeeModal(discord.ui.Modal, title="تسجيل موظف جديد"):
                 )
                 return
         else:
-            # أوتوماتيك
             cell_list = sheet.col_values(1)
             filled = [v for v in cell_list[START_ROW-1:] if v != ""]
             next_row = START_ROW + len(filled)
@@ -74,11 +78,17 @@ class RegisterButton(discord.ui.View):
 
     @discord.ui.button(label="📋 تسجيل موظف جديد", style=discord.ButtonStyle.primary, custom_id="register_btn")
     async def open_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not has_allowed_role(interaction):
+            await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True)
+            return
         await interaction.response.send_modal(EmployeeModal())
 
 # --- Commands ---
 @tree.command(name="register", description="فتح ملف توظيف امن وحماية")
 async def register(interaction: discord.Interaction):
+    if not has_allowed_role(interaction):
+        await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True)
+        return
     if interaction.channel_id != THREAD_ID:
         await interaction.response.send_message("❌ الأمر ده شغال في الثريد المخصص بس!", ephemeral=True)
         return
@@ -86,6 +96,9 @@ async def register(interaction: discord.Interaction):
 
 @tree.command(name="setup", description="ارسال مسدج التوظيف")
 async def setup(interaction: discord.Interaction):
+    if not has_allowed_role(interaction):
+        await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True)
+        return
     if interaction.channel_id != THREAD_ID:
         await interaction.response.send_message("❌ شغال في الثريد المخصص بس!", ephemeral=True)
         return
