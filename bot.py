@@ -56,8 +56,8 @@ class ToظيفButton(discord.ui.View):
         await interaction.response.send_modal(TوظيفModal())
 
 # --- Command ---
-@tree.command(name="تسجيل", description="افتح فورم تسجيل موظف جديد")
-async def تسجيل(interaction: discord.Interaction):
+@tree.command(name="register", description="فتح ملف توظيف امن وحماية")
+async def register(interaction: discord.Interaction):
     if interaction.channel_id != THREAD_ID:
         await interaction.response.send_message("❌ الأمر ده شغال في الثريد المخصص بس!", ephemeral=True)
         return
