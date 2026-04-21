@@ -21,12 +21,12 @@ tree = discord.app_commands.CommandTree(client)
 
 THREAD_ID = int(os.environ.get("THREAD_ID"))
 START_ROW = int(os.environ.get("START_ROW", 64))
-ALLOWED_ROLE_ID = int(os.environ.get("ALLOWED_ROLE_ID"))
+ALLOWED_ROLE_IDS = [int(x) for x in os.environ.get("ALLOWED_ROLE_IDS", "").split(",") if x.strip()]
 
 # --- التحقق من الرول ---
 def has_allowed_role(interaction: discord.Interaction) -> bool:
     role_ids = [role.id for role in interaction.user.roles]
-    return ALLOWED_ROLE_ID in role_ids
+    return any(r in role_ids for r in ALLOWED_ROLE_IDS)
 
 # --- Modal ---
 class EmployeeModal(discord.ui.Modal, title="تسجيل موظف جديد"):
