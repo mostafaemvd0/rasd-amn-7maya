@@ -61,7 +61,10 @@ async def on_message(message):
     row[3] = data["كود"]        # D - الكود
     row[4] = data["تاريخ"]      # E - التاريخ
 
-    sheet.append_row(row)
+    # بيدور على أول صف فاضي من صف 64 ولأسفل
+cell_list = sheet.col_values(1)  # بياخد كل قيم العمود A
+next_row = max(64, len(cell_list) + 1)
+sheet.insert_row(row, next_row)
 
     await message.reply(
         f"✅ تم التسجيل بنجاح!\n"
