@@ -14,7 +14,7 @@ creds_dict = json.loads(creds_json)
 creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
 gc = gspread.authorize(creds)
 
-SHEET_ID = os.environ.get("SHEET_ID")  # ID الشيت من الرابط
+SHEET_ID = os.environ.get("SHEET_ID")
 sheet = gc.open_by_key(SHEET_ID).sheet1
 
 # --- Discord Bot ---
@@ -22,7 +22,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
 
-THREAD_ID = int(os.environ.get("THREAD_ID"))  # ID الثريد اللي هيشتغل فيه
+THREAD_ID = int(os.environ.get("THREAD_ID"))
 
 @client.event
 async def on_ready():
@@ -55,16 +55,15 @@ async def on_message(message):
 
     discord_id = f"<@{data['ايدي']}>"
     row = [""] * 5
-    row[0] = discord_id         # A - الأيدي
-    row[1] = data["رتبة"]       # B - الرتبة
-    row[2] = data["اسم"]        # C - الاسم
-    row[3] = data["كود"]        # D - الكود
-    row[4] = data["تاريخ"]      # E - التاريخ
+    row[0] = discord_id
+    row[1] = data["رتبة"]
+    row[2] = data["اسم"]
+    row[3] = data["كود"]
+    row[4] = data["تاريخ"]
 
-    # بيدور على أول صف فاضي من صف 64 ولأسفل
-cell_list = sheet.col_values(1)  # بياخد كل قيم العمود A
-next_row = max(64, len(cell_list) + 1)
-sheet.insert_row(row, next_row)
+    cell_list = sheet.col_values(1)
+    next_row = max(64, len(cell_list) + 1)
+    sheet.insert_row(row, next_row)
 
     await message.reply(
         f"✅ تم التسجيل بنجاح!\n"
