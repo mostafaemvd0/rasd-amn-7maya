@@ -61,6 +61,16 @@ async def register(interaction: discord.Interaction):
         await interaction.response.send_message("❌ الأمر ده شغال في الثريد المخصص بس!", ephemeral=True)
         return
     await interaction.response.send_message("اضغط الزرار عشان تفتح الفورم:", view=RegisterButton())
+@tree.command(name="setup", description="بعت رسالة التسجيل")
+async def setup(interaction: discord.Interaction):
+    if interaction.channel_id != THREAD_ID:
+        await interaction.response.send_message("❌ شغال في الثريد المخصص بس!", ephemeral=True)
+        return
+    await interaction.response.send_message("✅ تم!", ephemeral=True)
+    await interaction.channel.send(
+        "📋 **تسجيل موظف جديد**\nاضغط الزرار عشان تفتح الفورم:",
+        view=RegisterButton()
+    )
 
 @client.event
 async def on_ready():
