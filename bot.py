@@ -63,7 +63,7 @@ async def on_message(message):
 
     cell_list = sheet.col_values(1)
     next_row = max(64, len(cell_list) + 1)
-    sheet.insert_row(row, next_row)
+    sheet.update(f'A{next_row}:E{next_row}', [row])
 
     await message.reply(
         f"✅ تم التسجيل بنجاح!\n"
