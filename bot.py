@@ -62,7 +62,8 @@ async def on_message(message):
     row[4] = data["تاريخ"]
 
     cell_list = sheet.col_values(1)
-    next_row = max(64, len(cell_list) + 1)
+    filled_from_64 = [v for v in cell_list[63:] if v != ""]
+    next_row = 64 + len(filled_from_64)
     sheet.update([row], f'A{next_row}:E{next_row}')
 
     await message.reply(
