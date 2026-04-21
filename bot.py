@@ -8,12 +8,10 @@ import json
 
 # --- Setup Google Sheets ---
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-
 creds_json = os.environ.get("GOOGLE_CREDENTIALS")
 creds_dict = json.loads(creds_json)
 creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
 gc = gspread.authorize(creds)
-
 SHEET_ID = os.environ.get("SHEET_ID")
 sheet = gc.open_by_key(SHEET_ID).sheet1
 
@@ -21,56 +19,53 @@ sheet = gc.open_by_key(SHEET_ID).sheet1
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
+tree = discord.app_commands.CommandTree(client)
 
 THREAD_ID = int(os.environ.get("THREAD_ID"))
+START_ROW = int(os.environ.get("START_ROW", 64))
+
+# --- Modal (الفورم) ---
+class TوظيفModal(discord.ui.Modal, title="تسجيل موظف جديد"):
+    اسم = discord.ui.TextInput(label="الاسم", placeholder="اكتب الاسم الكامل")
+    كود = discord.ui.TextInput(label="الكود", placeholder="مثلاً: EMP001")
+    ايدي = discord.ui.TextInput(label="Discord ID", placeholder="مثلاً: 123456789012345678")
+    رتبة = discord.ui.TextInput(label="الرتبة", placeholder="مثلاً: مشرف")
+    تاريخ = discord.ui.TextInput(label="تاريخ التعيين", placeholder="مثلاً: 2024-01-15")
+
+    async def on_submit(self, interaction: discord.Interaction):
+        discord_id = f"<@{self.ايدي.value}>"
+        row = [discord_id, self.رتبة.value, self.اسم.value, self.كود.value, self.تاريخ.value]
+
+        cell_list = sheet.col_values(1)
+        filled = [v for v in cell_list[START_ROW-1:] if v != ""]
+        next_row = START_ROW + len(filled)
+
+        sheet.update([row], f'A{next_row}:E{next_row}')
+
+        await interaction.response.send_message(
+            f"✅ تم التسجيل بنجاح في صف {next_row}!\n"
+            f"👤 **{self.اسم.value}** | {self.رتبة.value}\n"
+            f"🆔 {discord_id} | 📅 {self.تاريخ.value}",
+            ephemeral=True
+        )
+
+# --- زرار الفورم ---
+class ToظيفButton(discord.ui.View):
+    @discord.ui.button(label="📋 تسجيل موظف جديد", style=discord.ButtonStyle.primary)
+    async def open_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(TوظيفModal())
+
+# --- Command ---
+@tree.command(name="تسجيل", description="افتح فورم تسجيل موظف جديد")
+async def تسجيل(interaction: discord.Interaction):
+    if interaction.channel_id != THREAD_ID:
+        await interaction.response.send_message("❌ الأمر ده شغال في الثريد المخصص بس!", ephemeral=True)
+        return
+    await interaction.response.send_message("اضغط الزرار عشان تفتح الفورم:", view=ToظيفButton())
 
 @client.event
 async def on_ready():
+    await tree.sync()
     print(f"البوت شغال: {client.user}")
-
-@client.event
-async def on_message(message):
-    if message.author.bot:
-        return
-    if message.channel.id != THREAD_ID:
-        return
-
-    lines = message.content.strip().split("\n")
-    data = {}
-    for line in lines:
-        if ":" in line:
-            key, val = line.split(":", 1)
-            data[key.strip().lower()] = val.strip()
-
-    required = ["اسم", "كود", "ايدي", "رتبة", "تاريخ"]
-    missing = [r for r in required if r not in data]
-
-    if missing:
-        await message.reply(
-            f"❌ ناقص: {', '.join(missing)}\n\n"
-            "الصيغة الصح:\n"
-            "```\nاسم: محمد\nكود: A123\nايدي: 123456789\nرتبة: عضو\nتاريخ: 2024-01-15\n```"
-        )
-        return
-
-    discord_id = f"<@{data['ايدي']}>"
-    row = [""] * 5
-    row[0] = discord_id
-    row[1] = data["رتبة"]
-    row[2] = data["اسم"]
-    row[3] = data["كود"]
-    row[4] = data["تاريخ"]
-
-    cell_list = sheet.col_values(1)
-    START_ROW = int(os.environ.get("START_ROW", 64))
-    filled = [v for v in cell_list[START_ROW-1:] if v != ""]
-    next_row = START_ROW + len(filled)
-    sheet.update([row], f'A{next_row}:E{next_row}')
-
-    await message.reply(
-        f"✅ تم التسجيل بنجاح!\n"
-        f"👤 **{data['اسم']}** | {data['رتبة']}\n"
-        f"🆔 {discord_id} | 📅 {data['تاريخ']}"
-    )
 
 client.run(os.environ.get("DISCORD_TOKEN"))
