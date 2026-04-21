@@ -28,6 +28,7 @@ class EmployeeModal(discord.ui.Modal, title="تسجيل موظف جديد"):
     f_code = discord.ui.TextInput(label="الكود", placeholder="مثلاً: S-01")
     f_id = discord.ui.TextInput(label="Discord ID", placeholder="مثلاً: 123456789012345678")
     f_rank = discord.ui.TextInput(label="الرتبة", placeholder="مثلاً: جندي")
+    f_row = discord.ui.TextInput(label="رقم الصف", placeholder="اتركه فاضي للأوتوماتيك", required=False)
 
     async def on_submit(self, interaction: discord.Interaction):
         from datetime import datetime
@@ -35,14 +36,32 @@ class EmployeeModal(discord.ui.Modal, title="تسجيل موظف جديد"):
         today = datetime.now().strftime("%Y-%m-%d")
         row = [discord_id, self.f_rank.value, self.f_name.value, self.f_code.value, today]
 
-        cell_list = sheet.col_values(1)
-        filled = [v for v in cell_list[START_ROW-1:] if v != ""]
-        next_row = START_ROW + len(filled)
+        # لو حدد صف معين
+        if self.f_row.value.strip():
+            try:
+                next_row = int(self.f_row.value.strip())
+                if next_row < START_ROW:
+                    await interaction.response.send_message(
+                        f"❌ رقم الصف لازم يكون {START_ROW} أو أكبر!",
+                        ephemeral=True
+                    )
+                    return
+            except ValueError:
+                await interaction.response.send_message(
+                    "❌ رقم الصف لازم يكون رقم صح!",
+                    ephemeral=True
+                )
+                return
+        else:
+            # أوتوماتيك
+            cell_list = sheet.col_values(1)
+            filled = [v for v in cell_list[START_ROW-1:] if v != ""]
+            next_row = START_ROW + len(filled)
 
         sheet.update([row], f'A{next_row}:E{next_row}')
 
         await interaction.response.send_message(
-            f"✅ تم التسجيل بنجاح!\n"
+            f"✅ تم التسجيل بنجاح في صف {next_row}!\n"
             f"👤 **{self.f_name.value}** | {self.f_rank.value}\n"
             f"🆔 {discord_id} | 📅 {today}",
             ephemeral=True
