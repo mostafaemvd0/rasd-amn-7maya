@@ -28,11 +28,12 @@ class EmployeeModal(discord.ui.Modal, title="تسجيل موظف جديد"):
     f_كود = discord.ui.TextInput(label="الكود", placeholder="مثلاً: S-01")
     f_ايدي = discord.ui.TextInput(label="Discord ID", placeholder="مثلاً: 123456789012345678")
     f_رتبة = discord.ui.TextInput(label="الرتبة", placeholder="مثلاً: جندي")
-    f_تاريخ = discord.ui.TextInput(label="تاريخ التعيين", placeholder="مثلاً: 2024-01-15")
 
     async def on_submit(self, interaction: discord.Interaction):
+        from datetime import datetime
         discord_id = f"<@{self.f_ايدي.value}>"
-        row = [discord_id, self.f_رتبة.value, self.f_اسم.value, self.f_كود.value, self.f_تاريخ.value]
+        today = datetime.now().strftime("%Y-%m-%d")
+        row = [discord_id, self.f_رتبة.value, self.f_اسم.value, self.f_كود.value, today]
 
         cell_list = sheet.col_values(1)
         filled = [v for v in cell_list[START_ROW-1:] if v != ""]
@@ -43,7 +44,7 @@ class EmployeeModal(discord.ui.Modal, title="تسجيل موظف جديد"):
         await interaction.response.send_message(
             f"✅ تم التسجيل بنجاح!\n"
             f"👤 **{self.f_اسم.value}** | {self.f_رتبة.value}\n"
-            f"🆔 {discord_id} | 📅 {self.f_تاريخ.value}",
+            f"🆔 {discord_id} | 📅 {today}",
             ephemeral=True
         )
 
