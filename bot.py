@@ -14,7 +14,7 @@ creds_dict = json.loads(creds_json)
 creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
 gc = gspread.authorize(creds)
 
-SHEET_ID = os.environ.get("جدول قطاع الامن و الحماية")  # ID الشيت من الرابط
+SHEET_ID = os.environ.get("SHEET_ID")  # ID الشيت من الرابط
 sheet = gc.open_by_key(SHEET_ID).sheet1
 
 # --- Discord Bot ---
@@ -22,7 +22,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
 
-THREAD_ID = int(os.environ.get("1421481962878795798"))  # ID الثريد اللي هيشتغل فيه
+THREAD_ID = int(os.environ.get("THREAD_ID"))  # ID الثريد اللي هيشتغل فيه
 
 @client.event
 async def on_ready():
