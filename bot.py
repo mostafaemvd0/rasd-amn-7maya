@@ -65,8 +65,8 @@ class EmployeeModal(discord.ui.Modal, title="تسجيل موظف جديد"):
         sheet.update([row], f'A{next_row}:E{next_row}')
 
         await interaction.response.send_message(
-            f"✅ تم التسجيل بنجاح في صف {next_row}!\n"
-            f"👤 **{self.f_name.value}** | {self.f_rank.value}\n"
+            f"✅ تم التسجيل بنجاح في صف {next_row}!\n\n"
+            f"👤 **{self.f_name.value}** | {self.f_rank.value}\n\n"
             f"🆔 {discord_id} | 📅 {today}",
             ephemeral=True
         )
