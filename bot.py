@@ -115,22 +115,22 @@ class UpdateIDModal(discord.ui.Modal):
             ephemeral=True
         )
 
-# --- View الحالات (بيتبعت ephemeral لما تضغط تحديث حالة) ---
+# --- زرار الحالة (ديناميكي) ---
+class StatusButton(discord.ui.Button):
+    def __init__(self, label: str, status: str, emoji: str, style):
+        super().__init__(label=f"{emoji} {label}", style=style, custom_id=f"status__{status}")
+        self.status = status
+        self.emoji_str = emoji
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(UpdateIDModal(status=self.status, emoji=self.emoji_str))
+
+# --- View الحالات ---
 class StatusButtonsView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=60)
         for s in STATUS_LIST:
-            btn = discord.ui.Button(
-                label=f"{s['emoji']} {s['label']}",
-                style=s["style"],
-                custom_id=f"status__{s['status']}"
-            )
-            async def make_callback(status=s["status"], emoji=s["emoji"]):
-                async def callback(interaction: discord.Interaction):
-                    await interaction.response.send_modal(UpdateIDModal(status=status, emoji=emoji))
-                return callback
-            btn.callback = await make_callback(s["status"], s["emoji"])  # ❌ غلط
-            self.add_item(btn)
+            self.add_item(StatusButton(s["label"], s["status"], s["emoji"], s["style"]))
 
 # --- الأزرار الرئيسية ---
 class RegisterButton(discord.ui.View):
