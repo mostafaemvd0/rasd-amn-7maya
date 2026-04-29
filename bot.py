@@ -34,9 +34,12 @@ ALLOWED_ROLE_IDS = [int(x) for x in os.environ.get("ALLOWED_ROLE_IDS", "").split
 # ╚══════════════════════════════════════════════╝
 STATUS_LIST = [
     {"label": "توظيف",     "status": "توظيف",     "emoji": "📝", "style": discord.ButtonStyle.success},
-    {"label": "في الخدمة", "status": "في الخدمة", "emoji": "✅", "style": discord.ButtonStyle.success},
+    {"label": "فى الخدمة", "status": "فى الخدمة", "emoji": "✅", "style": discord.ButtonStyle.primary},
     {"label": "فصل",       "status": "فصل",       "emoji": "🚫", "style": discord.ButtonStyle.danger},
-    {"label": "ترقية",     "status": "ترقية",     "emoji": "⭐", "style": discord.ButtonStyle.primary},
+    {"label": "ترقية",     "status": "ترقية",     "emoji": "🟢", "style": discord.ButtonStyle.secondary},
+    {"label": "تغيير أكواد",     "status": "تغيير أكواد",     "emoji": "⭐", "style": discord.ButtonStyle.secondary},
+    {"label": "استقالة",     "status": "استقالة",     "emoji": "🚩", "style": discord.ButtonStyle.danger},
+    {"label": "إجازة خارجية",     "status": "إجازة خارجية",     "emoji": "✈️", "style": discord.ButtonStyle.secondary},
 ]
 
 # --- التحقق من الرول ---
