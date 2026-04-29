@@ -21,14 +21,23 @@ tree = discord.app_commands.CommandTree(client)
 
 THREAD_ID = int(os.environ.get("THREAD_ID"))
 START_ROW = int(os.environ.get("START_ROW", 64))
+STATUS_COLUMN = os.environ.get("STATUS_COLUMN", "T")
 ALLOWED_ROLE_IDS = [int(x) for x in os.environ.get("ALLOWED_ROLE_IDS", "").split(",") if x.strip()]
+
+VALID_STATUSES = ["توظيف", "في الخدمة", "فصل", "ترقية"]
+STATUS_EMOJIS = {
+    "توظيف": "📝",
+    "في الخدمة": "✅",
+    "فصل": "🚫",
+    "ترقية": "⭐",
+}
 
 # --- التحقق من الرول ---
 def has_allowed_role(interaction: discord.Interaction) -> bool:
     role_ids = [role.id for role in interaction.user.roles]
     return any(r in role_ids for r in ALLOWED_ROLE_IDS)
 
-# --- Modal ---
+# --- Modal التسجيل ---
 class EmployeeModal(discord.ui.Modal, title="تسجيل موظف جديد"):
     f_name = discord.ui.TextInput(label="الاسم", placeholder="اكتب الاسم الكامل")
     f_code = discord.ui.TextInput(label="الكود", placeholder="مثلاً: S-01")
@@ -71,7 +80,53 @@ class EmployeeModal(discord.ui.Modal, title="تسجيل موظف جديد"):
             ephemeral=True
         )
 
-# --- Button ---
+# --- Modal تحديث الحالة ---
+class UpdateStatusModal(discord.ui.Modal, title="تحديث حالة موظف"):
+    f_id = discord.ui.TextInput(
+        label="Discord ID",
+        placeholder="مثلاً: 123456789012345678"
+    )
+    f_status = discord.ui.TextInput(
+        label="الحالة الجديدة",
+        placeholder="توظيف | في الخدمة | فصل | ترقية"
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        raw_id = self.f_id.value.strip()
+        status = self.f_status.value.strip()
+
+        if status not in VALID_STATUSES:
+            await interaction.response.send_message(
+                f"❌ الحالة مش صح!\nالخيارات المتاحة: {' | '.join(VALID_STATUSES)}",
+                ephemeral=True
+            )
+            return
+
+        col_a = sheet.col_values(1)
+        target_row = None
+        mention_format = f"<@{raw_id}>"
+
+        for i, cell in enumerate(col_a[START_ROW - 1:], start=START_ROW):
+            if cell.strip() == mention_format:
+                target_row = i
+                break
+
+        if target_row is None:
+            await interaction.response.send_message(
+                f"❌ مش لاقي ID `{raw_id}` في الجدول!",
+                ephemeral=True
+            )
+            return
+
+        sheet.update([[status]], f'{STATUS_COLUMN}{target_row}')
+
+        emoji = STATUS_EMOJIS.get(status, "🔄")
+        await interaction.response.send_message(
+            f"{emoji} تم تحديث حالة <@{raw_id}> إلى **{status}** في صف {target_row}!",
+            ephemeral=True
+        )
+
+# --- Buttons ---
 class RegisterButton(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -82,6 +137,13 @@ class RegisterButton(discord.ui.View):
             await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True)
             return
         await interaction.response.send_modal(EmployeeModal())
+
+    @discord.ui.button(label="🔄 تحديث حالة موظف", style=discord.ButtonStyle.secondary, custom_id="update_status_btn")
+    async def open_status_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not has_allowed_role(interaction):
+            await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True)
+            return
+        await interaction.response.send_modal(UpdateStatusModal())
 
 # --- Commands ---
 @tree.command(name="register", description="فتح ملف توظيف امن وحماية")
@@ -102,17 +164,4 @@ async def setup(interaction: discord.Interaction):
     if interaction.channel_id != THREAD_ID:
         await interaction.response.send_message("❌ شغال في الثريد المخصص بس!", ephemeral=True)
         return
-    await interaction.response.send_message("✅ تم!", ephemeral=True)
-    await interaction.channel.send(
-        "📋 **تسجيل موظف جديد**\nاضغط الزرار عشان تفتح الفورم:",
-        view=RegisterButton()
-    )
-
-@client.event
-async def on_ready():
-    await tree.sync()
-    client.add_view(RegisterButton())
-    print(f"البوت شغال: {client.user}")
-    print(f"Commands synced!")
-
-client.run(os.environ.get("DISCORD_TOKEN"))
+    await interaction.response.send_m
