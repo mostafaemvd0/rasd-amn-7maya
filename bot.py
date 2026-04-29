@@ -24,12 +24,20 @@ START_ROW = int(os.environ.get("START_ROW", 64))
 STATUS_COLUMN = os.environ.get("STATUS_COLUMN", "T")
 ALLOWED_ROLE_IDS = [int(x) for x in os.environ.get("ALLOWED_ROLE_IDS", "").split(",") if x.strip()]
 
-STATUS_EMOJIS = {
-    "توظيف":     "📝",
-    "في الخدمة": "✅",
-    "فصل":       "🚫",
-    "ترقية":     "⭐",
-}
+# ╔══════════════════════════════════════════════╗
+# ║         ✏️ أضيف حالة جديدة هنا بس           ║
+# ║  label = الاسم اللي يظهر على الزرار          ║
+# ║  status = القيمة اللي تتكتب في الشيت         ║
+# ║  emoji  = الإيموجي                           ║
+# ║  style  = success(أخضر) danger(أحمر)         ║
+# ║           primary(أزرق) secondary(رمادي)     ║
+# ╚══════════════════════════════════════════════╝
+STATUS_LIST = [
+    {"label": "توظيف",     "status": "توظيف",     "emoji": "📝", "style": discord.ButtonStyle.success},
+    {"label": "في الخدمة", "status": "في الخدمة", "emoji": "✅", "style": discord.ButtonStyle.success},
+    {"label": "فصل",       "status": "فصل",       "emoji": "🚫", "style": discord.ButtonStyle.danger},
+    {"label": "ترقية",     "status": "ترقية",     "emoji": "⭐", "style": discord.ButtonStyle.primary},
+]
 
 # --- التحقق من الرول ---
 def has_allowed_role(interaction: discord.Interaction) -> bool:
@@ -74,10 +82,10 @@ class EmployeeModal(discord.ui.Modal, title="تسجيل موظف جديد"):
             ephemeral=True
         )
 
-# --- Modal تحديث الحالة (بيستقبل الحالة جاهزة) ---
+# --- Modal تحديث الحالة ---
 class UpdateIDModal(discord.ui.Modal):
-    def __init__(self, status: str):
-        super().__init__(title=f"تحديث الحالة إلى: {status}")
+    def __init__(self, status: str, emoji: str):
+        super().__init__(title=f"تحديث الحالة إلى {emoji} {status}")
         self.status = status
 
     f_id = discord.ui.TextInput(
@@ -87,9 +95,9 @@ class UpdateIDModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction):
         raw_id = self.f_id.value.strip()
-        col_a  = sheet.col_values(1)
-        target_row    = None
         mention_format = f"<@{raw_id}>"
+        col_a = sheet.col_values(1)
+        target_row = None
 
         for i, cell in enumerate(col_a[START_ROW - 1:], start=START_ROW):
             if cell.strip() == mention_format:
@@ -102,56 +110,53 @@ class UpdateIDModal(discord.ui.Modal):
             return
 
         sheet.update([[self.status]], f'{STATUS_COLUMN}{target_row}')
-        emoji = STATUS_EMOJIS.get(self.status, "🔄")
         await interaction.response.send_message(
-            f"{emoji} تم تحديث حالة <@{raw_id}> إلى **{self.status}** في صف {target_row}!",
+            f"✅ تم تحديث حالة <@{raw_id}> إلى **{self.status}** في صف {target_row}!",
             ephemeral=True
         )
+
+# --- View الحالات (بيتبعت ephemeral لما تضغط تحديث حالة) ---
+class StatusButtonsView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=60)
+        for s in STATUS_LIST:
+            btn = discord.ui.Button(
+                label=f"{s['emoji']} {s['label']}",
+                style=s["style"],
+                custom_id=f"status__{s['status']}"
+            )
+            async def make_callback(status=s["status"], emoji=s["emoji"]):
+                async def callback(interaction: discord.Interaction):
+                    await interaction.response.send_modal(UpdateIDModal(status=status, emoji=emoji))
+                return callback
+            btn.callback = await make_callback(s["status"], s["emoji"])  # ❌ غلط
+            self.add_item(btn)
 
 # --- الأزرار الرئيسية ---
 class RegisterButton(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    # ── زرار التسجيل ──
-    @discord.ui.button(label="📋 تسجيل موظف جديد", style=discord.ButtonStyle.primary, custom_id="register_btn", row=0)
-    async def open_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="📋 تسجيل موظف جديد", style=discord.ButtonStyle.primary, custom_id="register_btn")
+    async def open_register(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not has_allowed_role(interaction):
             await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True)
             return
         await interaction.response.send_modal(EmployeeModal())
 
-    # ── زراير الحالات الأربعة ──
-    @discord.ui.button(label="📝 توظيف", style=discord.ButtonStyle.success, custom_id="status_توظيف", row=1)
-    async def status_tawzeef(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="🔄 تحديث حالة", style=discord.ButtonStyle.secondary, custom_id="update_status_btn")
+    async def open_status_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not has_allowed_role(interaction):
             await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True)
             return
-        await interaction.response.send_modal(UpdateIDModal(status="توظيف"))
-
-    @discord.ui.button(label="✅ في الخدمة", style=discord.ButtonStyle.success, custom_id="status_في_الخدمة", row=1)
-    async def status_fi_alkhedma(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_allowed_role(interaction):
-            await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True)
-            return
-        await interaction.response.send_modal(UpdateIDModal(status="في الخدمة"))
-
-    @discord.ui.button(label="🚫 فصل", style=discord.ButtonStyle.danger, custom_id="status_فصل", row=2)
-    async def status_fasl(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_allowed_role(interaction):
-            await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True)
-            return
-        await interaction.response.send_modal(UpdateIDModal(status="فصل"))
-
-    @discord.ui.button(label="⭐ ترقية", style=discord.ButtonStyle.primary, custom_id="status_ترقية", row=2)
-    async def status_tarqia(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_allowed_role(interaction):
-            await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True)
-            return
-        await interaction.response.send_modal(UpdateIDModal(status="ترقية"))
+        await interaction.response.send_message(
+            "اختار الحالة الجديدة:",
+            view=StatusButtonsView(),
+            ephemeral=True
+        )
 
 # --- Commands ---
-@tree.command(name="register", description="فتح ملف توظيف امن وحماية")
+@tree.command(name="register", description="فتح ملف توظيف")
 async def register(interaction: discord.Interaction):
     if not has_allowed_role(interaction):
         await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True)
@@ -180,6 +185,5 @@ async def on_ready():
     await tree.sync()
     client.add_view(RegisterButton())
     print(f"البوت شغال: {client.user}")
-    print(f"Commands synced!")
 
 client.run(os.environ.get("DISCORD_TOKEN"))
