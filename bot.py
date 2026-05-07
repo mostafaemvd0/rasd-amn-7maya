@@ -1,5 +1,58 @@
+import discord
+import gspread
+from google.oauth2.service_account import Credentials
+import os
+import json
+from datetime import datetime
+
+# --- Setup Google Sheets ---
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+creds_json = os.environ.get("GOOGLE_CREDENTIALS")
+creds_dict = json.loads(creds_json)
+creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+gc = gspread.authorize(creds)
+
+SHEET_ID         = os.environ.get("SHEET_ID")
+AFFAIRS_SHEET_ID = os.environ.get("AFFAIRS_SHEET_ID")
+
+workbook         = gc.open_by_key(SHEET_ID)
+affairs_workbook = gc.open_by_key(AFFAIRS_SHEET_ID)
+
+SHEET_NAMES = {
+    "اساسي": os.environ.get("SHEET_NAME_MAIN",    "جدول رئيسي"),
+    "اداري": os.environ.get("SHEET_NAME_ADMIN",   "جدول اداري"),
+    "شؤون":  os.environ.get("SHEET_NAME_AFFAIRS", "شؤون ادارية"),
+}
+
+def get_sheet(key: str):
+    if key == "شؤون":
+        return affairs_workbook.worksheet(SHEET_NAMES[key])
+    return workbook.worksheet(SHEET_NAMES[key])
+
+# --- Discord Bot ---
+intents = discord.Intents.default()
+intents.message_content = True
+client = discord.Client(intents=intents)
+tree = discord.app_commands.CommandTree(client)
+
+THREAD_ID        = int(os.environ.get("THREAD_ID"))
+START_ROW        = int(os.environ.get("START_ROW", 64))
+STATUS_COLUMN    = os.environ.get("STATUS_COLUMN", "T")
+ALLOWED_ROLE_IDS = [int(x) for x in os.environ.get("ALLOWED_ROLE_IDS", "").split(",") if x.strip()]
+
+STATUS_LIST = [
+    {"label": "توظيف",     "status": "توظيف",     "emoji": "📝", "style": discord.ButtonStyle.success},
+    {"label": "فى الخدمة", "status": "فى الخدمة", "emoji": "✅", "style": discord.ButtonStyle.success},
+    {"label": "فصل",       "status": "فصل",       "emoji": "🚫", "style": discord.ButtonStyle.danger},
+    {"label": "ترقية",     "status": "ترقية",     "emoji": "⭐", "style": discord.ButtonStyle.primary},
+]
+
+def has_allowed_role(interaction: discord.Interaction) -> bool:
+    role_ids = [role.id for role in interaction.user.roles]
+    return any(r in role_ids for r in ALLOWED_ROLE_IDS)
+
 # ══════════════════════════════════════════════════════════
-#  ✅ View اختيار الانتساب — بتظهر بعد رصد اساسي/اداري
+#  View اختيار الانتساب — بتظهر بعد رصد اساسي/اداري
 # ══════════════════════════════════════════════════════════
 class EntisabView(discord.ui.View):
     def __init__(self, discord_id: str):
@@ -24,7 +77,6 @@ class EntisabView(discord.ui.View):
             filled     = [v for v in col_a[START_ROW - 1:] if v != ""]
             next_row   = START_ROW + len(filled)
 
-            # ✅ بيكتب ID في A والانتساب في E بس
             sheet.update([[discord_id]], f'A{next_row}')
             sheet.update([[entisab]],   f'E{next_row}')
 
@@ -40,9 +92,8 @@ class EntisabView(discord.ui.View):
             )
         return callback
 
-
 # ══════════════════════════════════════════════════════════
-#  ✅ EmployeeModal — بعد الرصد بيعرض أزرار الانتساب
+#  Modal رصد موظف (رئيسي / اداري)
 # ══════════════════════════════════════════════════════════
 class EmployeeModal(discord.ui.Modal):
     f_name = discord.ui.TextInput(label="الاسم",      placeholder="اكتب الاسم الكامل")
@@ -57,7 +108,6 @@ class EmployeeModal(discord.ui.Modal):
         self.sheet_label = sheet_label
 
     async def on_submit(self, interaction: discord.Interaction):
-        from datetime import datetime
         sheet      = get_sheet(self.sheet_key)
         discord_id = f"<@{self.f_id.value}>"
         today      = datetime.now().strftime("%Y-%m-%d")
@@ -79,7 +129,6 @@ class EmployeeModal(discord.ui.Modal):
 
         sheet.update([row], f'A{next_row}:E{next_row}')
 
-        # ✅ رسالة النجاح + أزرار الانتساب
         await interaction.response.send_message(
             f"✅ تم الرصد في **{self.sheet_label}** — صف {next_row}!\n"
             f"👤 **{self.f_name.value}** | {self.f_rank.value}\n"
@@ -90,9 +139,132 @@ class EmployeeModal(discord.ui.Modal):
             ephemeral=True
         )
 
+# ══════════════════════════════════════════════════════════
+#  Modal رصد شؤون ادارية
+# ══════════════════════════════════════════════════════════
+class AffairsModal(discord.ui.Modal, title="رصد شؤون ادارية"):
+    f_id      = discord.ui.TextInput(label="Discord ID",  placeholder="مثلاً: 123456789012345678")
+    f_entisab = discord.ui.TextInput(label="الانتساب",    placeholder="اكتب الانتساب")
+
+    async def on_submit(self, interaction: discord.Interaction):
+        sheet      = get_sheet("شؤون")
+        discord_id = f"<@{self.f_id.value}>"
+        col_a      = sheet.col_values(1)
+        filled     = [v for v in col_a[START_ROW - 1:] if v != ""]
+        next_row   = START_ROW + len(filled)
+
+        sheet.update([[discord_id]],           f'A{next_row}')
+        sheet.update([[self.f_entisab.value]], f'E{next_row}')
+
+        await interaction.response.send_message(
+            f"✅ تم الرصد في **{SHEET_NAMES['شؤون']}** — صف {next_row}!\n"
+            f"🆔 {discord_id} | 📋 {self.f_entisab.value}",
+            ephemeral=True
+        )
 
 # ══════════════════════════════════════════════════════════
-#  ✅ زرار شؤون ادارية — بقى فيه تحديث الحالة بس
+#  Modal تحديث الحالة
+# ══════════════════════════════════════════════════════════
+class UpdateIDModal(discord.ui.Modal):
+    def __init__(self, status: str, emoji: str, sheet_key: str, sheet_label: str):
+        super().__init__(title=f"تحديث الحالة — {emoji} {status} ({sheet_label})")
+        self.status      = status
+        self.sheet_key   = sheet_key
+        self.sheet_label = sheet_label
+
+    f_id = discord.ui.TextInput(
+        label="Discord ID",
+        placeholder="مثلاً: 123456789012345678"
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        sheet          = get_sheet(self.sheet_key)
+        raw_id         = self.f_id.value.strip()
+        mention_format = f"<@{raw_id}>"
+        col_a          = sheet.col_values(1)
+        target_row     = None
+
+        for i, cell in enumerate(col_a[START_ROW - 1:], start=START_ROW):
+            if cell.strip() == mention_format:
+                target_row = i
+                break
+
+        if target_row is None:
+            await interaction.response.send_message(
+                f"❌ مش لاقي ID `{raw_id}` في **{self.sheet_label}**!", ephemeral=True)
+            return
+
+        sheet.update([[self.status]], f'{STATUS_COLUMN}{target_row}')
+        await interaction.response.send_message(
+            f"✅ تم تحديث حالة <@{raw_id}> إلى **{self.status}** في **{self.sheet_label}** — صف {target_row}!",
+            ephemeral=True
+        )
+
+# ══════════════════════════════════════════════════════════
+#  View: اختيار الشيت لتحديث الحالة
+# ══════════════════════════════════════════════════════════
+class SheetSelectForStatusView(discord.ui.View):
+    SHEET_OPTIONS = [
+        {"key": "اساسي", "label": "جدول اساسيين", "emoji": "👥", "style": discord.ButtonStyle.primary},
+        {"key": "اداري", "label": "جدول اداريين", "emoji": "🏢", "style": discord.ButtonStyle.secondary},
+    ]
+
+    def __init__(self):
+        super().__init__(timeout=60)
+        for opt in self.SHEET_OPTIONS:
+            btn = discord.ui.Button(
+                label=f"{opt['emoji']} {opt['label']}",
+                style=opt["style"],
+                custom_id=f"sheetsel__{opt['key']}"
+            )
+            btn.callback = self._make_callback(opt["key"], opt["label"])
+            self.add_item(btn)
+
+    def _make_callback(self, sheet_key: str, sheet_label: str):
+        async def callback(interaction: discord.Interaction):
+            await interaction.response.send_message(
+                f"اختار الحالة الجديدة للشيت **{sheet_label}**:",
+                view=StatusButtonsView(sheet_key, sheet_label),
+                ephemeral=True
+            )
+        return callback
+
+# ══════════════════════════════════════════════════════════
+#  View: أزرار الحالات
+# ══════════════════════════════════════════════════════════
+class StatusButton(discord.ui.Button):
+    def __init__(self, label: str, status: str, emoji: str, style, sheet_key: str, sheet_label: str):
+        super().__init__(
+            label=f"{emoji} {label}",
+            style=style,
+            custom_id=f"status__{status}__{sheet_key}"
+        )
+        self.status      = status
+        self.emoji_str   = emoji
+        self.sheet_key   = sheet_key
+        self.sheet_label = sheet_label
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(
+            UpdateIDModal(
+                status=self.status,
+                emoji=self.emoji_str,
+                sheet_key=self.sheet_key,
+                sheet_label=self.sheet_label
+            )
+        )
+
+class StatusButtonsView(discord.ui.View):
+    def __init__(self, sheet_key: str, sheet_label: str):
+        super().__init__(timeout=60)
+        for s in STATUS_LIST:
+            self.add_item(StatusButton(
+                s["label"], s["status"], s["emoji"], s["style"],
+                sheet_key, sheet_label
+            ))
+
+# ══════════════════════════════════════════════════════════
+#  الأزرار الرئيسية
 # ══════════════════════════════════════════════════════════
 class MainView(discord.ui.View):
     def __init__(self):
@@ -110,7 +282,6 @@ class MainView(discord.ui.View):
             await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True); return
         await interaction.response.send_modal(EmployeeModal("اداري", SHEET_NAMES["اداري"]))
 
-    # ✅ زرار شؤون ادارية = تحديث الحالة بس
     @discord.ui.button(label="📁 شؤون ادارية — تحديث الحالة", style=discord.ButtonStyle.secondary, custom_id="btn_affairs")
     async def open_affairs(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not has_allowed_role(interaction):
@@ -130,3 +301,38 @@ class MainView(discord.ui.View):
             view=SheetSelectForStatusView(),
             ephemeral=True
         )
+
+# ══════════════════════════════════════════════════════════
+#  Commands
+# ══════════════════════════════════════════════════════════
+@tree.command(name="setup", description="ارسال مسدج الرصد الرئيسي")
+async def setup(interaction: discord.Interaction):
+    if not has_allowed_role(interaction):
+        await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True); return
+    if interaction.channel_id != THREAD_ID:
+        await interaction.response.send_message("❌ شغال في الثريد المخصص بس!", ephemeral=True); return
+    await interaction.response.send_message("✅ تم!", ephemeral=True)
+    await interaction.channel.send(
+        "📋 **لوحة الرصد**\nاختار الجدول المناسب:",
+        view=MainView()
+    )
+
+@tree.command(name="register", description="فتح لوحة الرصد")
+async def register(interaction: discord.Interaction):
+    if not has_allowed_role(interaction):
+        await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True); return
+    if interaction.channel_id != THREAD_ID:
+        await interaction.response.send_message("❌ الأمر ده شغال في الثريد المخصص بس!", ephemeral=True); return
+    await interaction.response.send_message(
+        "📋 **لوحة الرصد**\nاختار الجدول المناسب:",
+        view=MainView()
+    )
+
+# ══════════════════════════════════════════════════════════
+@client.event
+async def on_ready():
+    await tree.sync()
+    client.add_view(MainView())
+    print(f"البوت شغال: {client.user}")
+
+client.run(os.environ.get("DISCORD_TOKEN"))
