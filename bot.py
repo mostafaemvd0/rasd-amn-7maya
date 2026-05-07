@@ -72,7 +72,8 @@ class EmployeeModal(discord.ui.Modal):
     f_row  = discord.ui.TextInput(label="رقم الصف",   placeholder="اتركه فاضي للأوتوماتيك", required=False)
 
     def __init__(self, sheet_key: str, sheet_label: str):
-        super().__init__(title=f"رصد موظف — {sheet_label}")
+        title = f"رصد موظف — {sheet_label}"
+        super().__init__(title=title[:45])
         self.sheet_key   = sheet_key
         self.sheet_label = sheet_label
 
@@ -123,7 +124,7 @@ class AffairsModal(discord.ui.Modal, title="رصد شؤون ادارية"):
 
         # كتابة ID في عمود A والانتساب في عمود F
         sheet.update([[discord_id]],      f'A{next_row}')
-        sheet.update([[self.f_entisab.value]], f'F{next_row}')
+        sheet.update([[self.f_entisab.value]], f'E{next_row}')
 
         await interaction.response.send_message(
             f"✅ تم الرصد في **{SHEET_NAMES['شؤون']}** — صف {next_row}!\n\n"
