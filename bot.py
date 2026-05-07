@@ -282,16 +282,6 @@ class MainView(discord.ui.View):
             await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True); return
         await interaction.response.send_modal(EmployeeModal("اداري", SHEET_NAMES["اداري"]))
 
-    @discord.ui.button(label="📁 شؤون ادارية — تحديث الحالة", style=discord.ButtonStyle.secondary, custom_id="btn_affairs")
-    async def open_affairs(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_allowed_role(interaction):
-            await interaction.response.send_message("❌ مش عندك صلاحية!", ephemeral=True); return
-        await interaction.response.send_message(
-            "اختار الشيت اللي عايز تحدث فيه الحالة:",
-            view=SheetSelectForStatusView(),
-            ephemeral=True
-        )
-
     @discord.ui.button(label="🔄 تحديث حالة", style=discord.ButtonStyle.danger, custom_id="btn_update")
     async def open_update(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not has_allowed_role(interaction):
